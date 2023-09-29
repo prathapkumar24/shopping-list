@@ -5,17 +5,17 @@ const clearBtn = document.getElementById("clear");
 const filterInput = document.getElementById("filter");
 const formBtn = itemForm.querySelector("button");
 let isEditMode = false;
+let isCompletedMode = false;
 
 function displayItems() {
   const storageItems = getItemsFromStorage();
-  storageItems.forEach((item) => addItemtoDOM(item));
+  storageItems.forEach((item) => addItemtoDOM(item.value, item.completed));
   checkUI();
 }
 
 function addItem(e) {
   e.preventDefault();
   const newItem = itemInput.value.trim();
-  console.log(newItem);
   if (newItem === "") {
     alert("Please add an item");
     return;
@@ -39,20 +39,33 @@ function addItem(e) {
   checkUI();
 }
 
-function addItemtoDOM(item) {
+function addItemtoDOM(item, completed = false) {
   const listItem = document.createElement("li");
+  listItem.className = completed ? "done-mode" : "";
   listItem.appendChild(document.createTextNode(item));
-  const button = createButton("remove-item btn-link text-red");
-  listItem.appendChild(button);
-  itemList.appendChild(listItem);
+
+  const removeButton = createButton("remove-item btn-link text-red", "fa-solid fa-xmark");
+  const doneButton = createButton("done-item btn-link text-green", "fa-solid fa-check");
+  listItem.appendChild(doneButton);
+  listItem.appendChild(removeButton);
+
+  //itemList.insertBefore(listItem, itemList.firstChild);
+  //
+
+  if (document.querySelectorAll("ul li.done-mode").length > 0) {
+    itemList.insertBefore(listItem, document.querySelector("ul li.done-mode"));
+  } else {
+    itemList.appendChild(listItem);
+  }
 }
 
-function createButton(classes) {
+function createButton(classes, iconClasses) {
   const button = document.createElement("button");
   button.className = classes;
 
-  const icon = createIcon("fa-solid fa-xmark");
+  const icon = createIcon(iconClasses);
   button.appendChild(icon);
+
   return button;
 }
 
@@ -62,9 +75,9 @@ function createIcon(classes) {
   return icon;
 }
 
-function addItemtoStorage(item) {
+function addItemtoStorage(item, completed = false) {
   const storageItems = getItemsFromStorage();
-  storageItems.push(item);
+  storageItems.push({ value: item, completed: completed });
   localStorage.setItem("items", JSON.stringify(storageItems));
 }
 
@@ -75,12 +88,17 @@ function getItemsFromStorage() {
   } else {
     storageItems = JSON.parse(localStorage.getItem("items"));
   }
+  storageItems.sort((a, b) => a.completed - b.completed);
   return storageItems;
 }
 
 function onClickItem(e) {
   if (e.target.parentElement.classList.contains("remove-item")) {
     removeItem(e.target.parentElement.parentElement);
+  } else if (e.target.parentElement.classList.contains("done-item") && e.target.parentElement.parentElement.classList.contains("done-mode")) {
+    revertItem(e.target.parentElement.parentElement);
+  } else if (e.target.parentElement.classList.contains("done-item")) {
+    setItemToDone(e.target.parentElement.parentElement);
   } else if (e.target.closest("li")) {
     setItemToEdit(e.target);
   }
@@ -88,7 +106,8 @@ function onClickItem(e) {
 
 function checkItemExists(item) {
   const storageItems = getItemsFromStorage();
-  return storageItems.includes(item);
+  return storageItems.filter((e) => e.value === item).length > 0;
+  //return storageItems.includes(item);
 }
 function setItemToEdit(item) {
   isEditMode = true;
@@ -101,6 +120,21 @@ function setItemToEdit(item) {
   itemInput.value = item.textContent;
 }
 
+function setItemToDone(item) {
+  item.classList.add("done-mode");
+
+  removeItemFromStorage(item.textContent);
+  addItemtoStorage(item.textContent, true);
+  itemList.innerHTML = "";
+  displayItems();
+}
+
+function revertItem(item) {
+  item.classList.remove("done-mode");
+  removeItemFromStorage(item.textContent);
+  addItemtoStorage(item.textContent, false);
+}
+
 function removeItem(item) {
   if (confirm("Are you sure?")) {
     item.remove();
@@ -111,7 +145,7 @@ function removeItem(item) {
 
 function removeItemFromStorage(item) {
   let storageItems = getItemsFromStorage();
-  storageItems = storageItems.filter((i) => i !== item);
+  storageItems = storageItems.filter((i) => i.value !== item);
   localStorage.setItem("items", JSON.stringify(storageItems));
   checkUI();
 }
